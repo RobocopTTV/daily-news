@@ -1,0 +1,38 @@
+name: Daily news digest
+
+on:
+  schedule:
+    # 20:30 UTC = 06:30 AEST (winter, UTC+10) — finishes before the 07:00
+    # Claude scheduled task pulls the data.
+    # During daylight saving (Oct-Apr, UTC+11) change to "30 19 * * *".
+    - cron: "30 20 * * *"
+  workflow_dispatch: {} # allows manual runs from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate digest
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python news_digest.py --out-dir reports
+
+      - name: Commit report
+        run: |
+          git config user.name "news-digest-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add reports
+          git diff --cached --quiet && echo "Nothing to commit" && exit 0
+          git commit -m "Daily digest $(date -u +%F)"
+          git push
